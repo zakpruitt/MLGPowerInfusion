@@ -1,142 +1,216 @@
 local ADDON, ns = ...
 
 local POWER_INFUSION = 10060
+local PI_DURATION = 15
 local MEDIA = "Interface\\AddOns\\PowerInfusionMLG\\Media\\"
 local SOUND = MEDIA .. "mlg.mp3"
 local LOGO = MEDIA .. "logo"
 local LOGO_ICON = "|T" .. LOGO .. ":16:16|t"
 
 local WIDTH, HEIGHT = 600, 64
-local FADE_IN, HOLD, FADE_OUT = 0.15, 2.75, 0.6
+local BG_PAD_X, BG_PAD_Y = 12, 6
+local TEXT_R, TEXT_G, TEXT_B = 1, 0.85, 0.1
+local FADE_IN, HOLD, FADE_OUT = 0.15, 2.75, 0.6 -- gone 3.5s after PI lands
+local GONE_AT = PI_DURATION - (FADE_IN + HOLD + FADE_OUT) -- PI time remaining when the banner is gone
+
 local CHANNELS = { master = "Master", sfx = "SFX", music = "Music", ambience = "Ambience", dialog = "Dialog" }
 local DEFAULTS = { enabled = true, alert = true, channel = "Master" }
 
-local db
-local lastMessage
-local soundID
+local db, lastMessage, soundID
 
 local function Print(msg)
     print(LOGO_ICON .. " |cffff66ccPI MLG|r " .. msg)
 end
 
--- Banner
-
-local function CreateBanner(parent, template)
-    local banner = CreateFrame("Frame", nil, parent, template)
-    banner:SetSize(WIDTH, HEIGHT)
-
-    local bg = banner:CreateTexture(nil, "BACKGROUND")
-    bg:SetPoint("TOPLEFT", -12, 6)
-    bg:SetPoint("BOTTOMRIGHT", 12, -6)
-    bg:SetColorTexture(0, 0, 0, 0.55)
-
-    local logo = banner:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(56, 56)
-    logo:SetPoint("LEFT", 4, 0)
-    logo:SetTexture(LOGO)
-
-    banner.batchest = banner:CreateTexture(nil, "ARTWORK")
-    banner.batchest:SetSize(56, 56)
-    banner.batchest:SetPoint("RIGHT", -4, 0)
-    banner.batchest:SetTexture(MEDIA .. "batchest")
-
-    banner.text = banner:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    banner.text:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-    banner.text:SetPoint("RIGHT", -70, 0)
-    banner.text:SetTextColor(1, 0.85, 0.1)
-    banner.text:SetShadowOffset(2, -2)
-
-    banner.flipbook = banner.batchest:CreateAnimationGroup()
-    banner.flipbook:SetLooping("REPEAT")
-    local frames = banner.flipbook:CreateAnimation("FlipBook")
-    frames:SetFlipBookRows(4)
-    frames:SetFlipBookColumns(8)
-    frames:SetFlipBookFrames(21)
-    frames:SetDuration(21 * 0.04)
-
-    -- Fade in, hold, fade out, and stay invisible until shown again
-    local fade = banner:CreateAnimationGroup()
-    fade:SetToFinalAlpha(true)
-    local fadeIn = fade:CreateAnimation("Alpha")
-    fadeIn:SetFromAlpha(0)
-    fadeIn:SetToAlpha(1)
-    fadeIn:SetDuration(FADE_IN)
-    local fadeOut = fade:CreateAnimation("Alpha")
-    fadeOut:SetFromAlpha(1)
-    fadeOut:SetToAlpha(0)
-    fadeOut:SetStartDelay(FADE_IN + HOLD)
-    fadeOut:SetDuration(FADE_OUT)
-    banner.fade = fade
-
-    -- Runs whenever the banner becomes visible, including when Blizzard shows the aura button
-    banner:SetScript("OnShow", function()
-        pcall(banner.flipbook.Restart, banner.flipbook)
-        pcall(fade.Restart, fade)
-    end)
-    return banner
-end
-
-local function SetMessage(banner)
+local function PickMessage()
     local messages = ns.messages
     local msg
     repeat
         msg = messages[math.random(#messages)]
     until msg ~= lastMessage or #messages < 2
     lastMessage = msg
-    banner.text:SetText((msg.text:gsub("{player}", UnitName("player"))))
-    banner.batchest:SetShown(msg.batchest == true)
+    return msg
 end
 
--- Test banner: a normal frame we show ourselves for /pimlg test
-local testBanner = CreateBanner(UIParent)
+local function MessageText(msg)
+    return (msg.text:gsub("{player}", UnitName("player")))
+end
+
+-- Test banner (/pimlg test): a normal frame we fade ourselves
+
+local testBanner = CreateFrame("Frame", nil, UIParent)
+testBanner:SetSize(WIDTH, HEIGHT)
 testBanner:SetPoint("TOP", 0, -140)
 testBanner:SetFrameStrata("HIGH")
 testBanner:Hide()
-testBanner.fade:SetScript("OnFinished", function() testBanner:Hide() end)
+
+local bg = testBanner:CreateTexture(nil, "BACKGROUND")
+bg:SetPoint("TOPLEFT", -BG_PAD_X, BG_PAD_Y)
+bg:SetPoint("BOTTOMRIGHT", BG_PAD_X, -BG_PAD_Y)
+bg:SetColorTexture(0, 0, 0, 0.55)
+
+local logo = testBanner:CreateTexture(nil, "ARTWORK")
+logo:SetSize(56, 56)
+logo:SetPoint("LEFT", 4, 0)
+logo:SetTexture(LOGO)
+
+local batchest = testBanner:CreateTexture(nil, "ARTWORK")
+batchest:SetSize(56, 56)
+batchest:SetPoint("RIGHT", -4, 0)
+batchest:SetTexture(MEDIA .. "batchest")
+
+local testText = testBanner:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+testText:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+testText:SetPoint("RIGHT", -70, 0)
+testText:SetTextColor(TEXT_R, TEXT_G, TEXT_B)
+testText:SetShadowOffset(2, -2)
+
+local flipbook = batchest:CreateAnimationGroup()
+flipbook:SetLooping("REPEAT")
+local frames = flipbook:CreateAnimation("FlipBook")
+frames:SetFlipBookRows(4)
+frames:SetFlipBookColumns(8)
+frames:SetFlipBookFrames(21)
+frames:SetDuration(21 * 0.04)
+
+local fade = testBanner:CreateAnimationGroup()
+local fadeIn = fade:CreateAnimation("Alpha")
+fadeIn:SetFromAlpha(0)
+fadeIn:SetToAlpha(1)
+fadeIn:SetDuration(FADE_IN)
+local fadeOut = fade:CreateAnimation("Alpha")
+fadeOut:SetFromAlpha(1)
+fadeOut:SetToAlpha(0)
+fadeOut:SetStartDelay(FADE_IN + HOLD)
+fadeOut:SetDuration(FADE_OUT)
+fade:SetScript("OnFinished", function()
+    flipbook:Stop()
+    testBanner:Hide()
+end)
 
 local function PlayMLG()
     PlaySoundFile(SOUND, db.channel)
     if not db.alert then return end
-    SetMessage(testBanner)
-    testBanner:Hide()
+    local msg = PickMessage()
+    testText:SetText(MessageText(msg))
+    batchest:SetShown(msg.batchest == true)
+    fade:Stop()
+    flipbook:Restart()
     testBanner:Show()
+    fade:Play()
 end
 
--- PI banner: Blizzard shows an aura button while PI is on us, even in combat
--- where the aura is secret. Our banner is a child of that button, painted
--- before the button binds to the aura (after that it can't be touched).
+-- PI banner: Blizzard's aura button shows while PI is on us, even in combat, but
+-- addon scripts can't run on it. Everything is driven by the aura's timer instead:
+-- the message is its duration text (blank and faded out after GONE_AT), and the
+-- background is a stretched duration bar whose edge sweeps off during the fade.
+
 local auraContainer, auraBanner
 
-local function CreateAuraBanner()
+local function BannerString(msg)
+    local s = "|T" .. LOGO .. ":32:32|t  " .. MessageText(msg):gsub("%%", "%%%%")
+    if msg.batchest then
+        s = s .. "  |T" .. MEDIA .. "batchest:32:32:0:0:512:256:0:64:0:64|t" -- first flipbook frame
+    end
+    return s
+end
+
+local function BindAuraText(banner)
+    return pcall(function()
+        banner.formatter:SetBreakpoints({
+            { threshold = 0, format = "" },
+            { threshold = GONE_AT, format = BannerString(PickMessage()) },
+        })
+        banner.button:SetDurationText(banner.text, { binding = banner.binding })
+    end)
+end
+
+local function CreateBackground(banner, button)
+    local clip = CreateFrame("Frame", nil, banner)
+    clip:SetPoint("TOPLEFT", -BG_PAD_X, BG_PAD_Y)
+    clip:SetPoint("BOTTOMRIGHT", BG_PAD_X, -BG_PAD_Y)
+    clip:SetClipsChildren(true)
+
+    local clipW = WIDTH + 2 * BG_PAD_X
+    local barW = clipW * PI_DURATION / FADE_OUT
+    local bar = CreateFrame("StatusBar", nil, clip)
+    bar:SetPoint("TOP")
+    bar:SetPoint("BOTTOM")
+    bar:SetPoint("LEFT", clip, "LEFT", clipW - barW * (GONE_AT + FADE_OUT) / PI_DURATION, 0)
+    bar:SetWidth(barW)
+    bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+    bar:SetStatusBarColor(0, 0, 0, 0.55)
+    button:SetDurationBar(bar, {
+        interpolation = Enum.StatusBarInterpolation.Immediate,
+        direction = Enum.StatusBarTimerDirection.RemainingTime,
+    })
+end
+
+local function CreateTextBinding(banner)
+    local curve = C_CurveUtil.CreateColorCurve()
+    curve:AddPoint(GONE_AT, CreateColor(TEXT_R, TEXT_G, TEXT_B, 0))
+    curve:AddPoint(GONE_AT + FADE_OUT, CreateColor(TEXT_R, TEXT_G, TEXT_B, 1))
+    banner.formatter = C_StringUtil.CreateNumericRuleFormatter()
+    banner.binding = C_DurationUtil.CreateDurationTextBinding()
+    banner.binding:SetFormatter(banner.formatter)
+    banner.binding:SetTextColorCurve(curve, Enum.DurationTextBindingProperty.RemainingDuration)
+    pcall(banner.binding.SetUpdateInterval, banner.binding, 0.05)
+    pcall(banner.binding.SetFontString, banner.binding, banner.text)
+end
+
+local function InitAuraButton(button)
+    if auraBanner then return end
+    button:EnableMouse(false)
+
+    local banner = CreateFrame("Frame", nil, button, "DisableUntrustedLayoutScriptsTemplate")
+    banner:SetSize(WIDTH, HEIGHT)
+    banner:SetPoint("CENTER", auraContainer)
+    banner.button = button
+    pcall(CreateBackground, banner, button)
+
+    local textHost = CreateFrame("Frame", nil, banner)
+    textHost:SetAllPoints()
+    textHost:SetFrameLevel(banner:GetFrameLevel() + 5)
+
+    -- The engine sets the text on registration, so the font must already be set
+    banner.text = textHost:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    banner.text:SetAllPoints()
+    banner.text:SetTextColor(TEXT_R, TEXT_G, TEXT_B)
+    banner.text:SetShadowOffset(2, -2)
+
+    if not (pcall(CreateTextBinding, banner) and BindAuraText(banner)) then
+        -- No engine text: static message for the whole PI window
+        banner.formatter = nil
+        banner.text:SetText(MessageText(PickMessage()))
+    end
+    auraBanner = banner
+end
+
+local function CreateAuraContainer()
     C_AddOns.LoadAddOn("Blizzard_AuraContainer")
     local ok, container = pcall(CreateFrame, "AuraContainer", nil, UIParent, "CustomAuraContainerTemplate")
-    if not ok or not container then return end
+    if not (ok and container) then return end
     container:SetPoint("TOP", 0, -140)
     container:SetSize(WIDTH, HEIGHT)
     container:SetFrameStrata("HIGH")
     container:EnableMouse(false)
-
-    local function Init(button)
-        if auraBanner then return end
-        button:EnableMouse(false)
-        auraBanner = CreateBanner(button, "DisableUntrustedLayoutScriptsTemplate")
-        auraBanner:SetPoint("CENTER", container)
-        SetMessage(auraBanner)
-    end
+    auraContainer = container
 
     local slotOk, slot = pcall(container.AddAuraSlot, container, "pimlg", "HELPFUL", {
         maxFrameCount = 1,
-        initializeFrame = Init,
+        initializeFrame = InitAuraButton,
         candidateFilters = { includeSpellIDs = { [POWER_INFUSION] = true } },
         layout = { elementWidth = WIDTH, elementHeight = HEIGHT },
     })
-    if not slotOk then return end
-    if type(slot) == "table" and slot.SetPoint then Init(slot) end
-    auraContainer = container
+    if not slotOk then
+        auraContainer = nil
+        return
+    end
+    if type(slot) == "table" and slot.SetPoint then InitAuraButton(slot) end
 end
 
 local function RefreshAuraBanner()
-    if not auraContainer then CreateAuraBanner() end
+    if not auraContainer then CreateAuraContainer() end
     if not auraContainer then return end
     local on = db.enabled and db.alert
     pcall(auraContainer.SetEnabled, auraContainer, on)
@@ -144,8 +218,8 @@ local function RefreshAuraBanner()
     if auraContainer.UpdateAllAuras then pcall(auraContainer.UpdateAllAuras, auraContainer) end
 end
 
--- Sound: Blizzard plays aura sounds itself, so this works in combat too.
--- Registering is blocked in combat and encounters; we retry after combat.
+-- Sound: Blizzard plays aura sounds itself, so it works in combat.
+-- Registering is blocked in combat, so we retry after combat.
 local function RegisterSound()
     if soundID then pcall(C_UnitAuras.RemoveAuraSound, soundID) end
     soundID = nil
@@ -174,8 +248,7 @@ events:SetScript("OnEvent", function(self, event, ...)
         RegisterSound()
     elseif event == "PLAYER_REGEN_ENABLED" then
         if not soundID then RegisterSound() end
-        -- Fresh message for the next PI
-        if auraBanner then pcall(SetMessage, auraBanner) end
+        if auraBanner and auraBanner.formatter then BindAuraText(auraBanner) end -- new message for next PI
     end
 end)
 
