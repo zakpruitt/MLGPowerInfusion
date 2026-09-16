@@ -1,0 +1,14 @@
+## Interface: 120100, 120001
+## Title: MLG Power Infusion
+## Notes: Makes your Power Infusion windows dank.
+## Author: spuggies
+## Version: 1.2.0
+## Category: Audio & Video
+## IconTexture: Interface\AddOns\MLGPowerInfusion\Media\logo
+## AddonCompartmentFunc: MLGPowerInfusion_OnCompartmentClick
+## AddonCompartmentFuncOnEnter: MLGPowerInfusion_OnCompartmentEnter
+## AddonCompartmentFuncOnLeave: MLGPowerInfusion_OnCompartmentLeave
+## SavedVariables: MLGPowerInfusionDB
+
+Messages.lua
+MLGPowerInfusion.lua

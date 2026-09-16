@@ -1,4 +1,4 @@
-# Power Infusion MLG
+# MLG Power Infusion
 
 Makes your Power Infusion windows dank.
 

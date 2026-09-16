@@ -24,8 +24,8 @@ jobs:
         id: ver
         run: |
           # Major.minor comes from the .toc; the patch is the run number
-          BASE=$(sed -nE 's/^## Version:[[:space:]]*([0-9]+\.[0-9]+).*/\1/p' PowerInfusionMLG.toc)
-          INTERFACE=$(sed -nE 's/^## Interface:[[:space:]]*([0-9]+).*/\1/p' PowerInfusionMLG.toc | head -1)
+          BASE=$(sed -nE 's/^## Version:[[:space:]]*([0-9]+\.[0-9]+).*/\1/p' MLGPowerInfusion.toc)
+          INTERFACE=$(sed -nE 's/^## Interface:[[:space:]]*([0-9]+).*/\1/p' MLGPowerInfusion.toc | head -1)
           echo "version=${BASE}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           echo "interface=${INTERFACE}" >> "$GITHUB_OUTPUT"
 
@@ -33,19 +33,19 @@ jobs:
         id: pkg
         run: |
           VERSION="${{ steps.ver.outputs.version }}"
-          ZIP="PowerInfusionMLG-${VERSION}.zip"
+          ZIP="MLGPowerInfusion-${VERSION}.zip"
           # Only what WoW loads; source art stays out of the zip
-          rm -rf dist && mkdir -p dist/PowerInfusionMLG/Media
-          cp PowerInfusionMLG.toc *.lua dist/PowerInfusionMLG/
-          cp Media/*.tga Media/*.mp3 dist/PowerInfusionMLG/Media/
-          sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" dist/PowerInfusionMLG/PowerInfusionMLG.toc
-          (cd dist && zip -qr "../${ZIP}" PowerInfusionMLG)
+          rm -rf dist && mkdir -p dist/MLGPowerInfusion/Media
+          cp MLGPowerInfusion.toc *.lua dist/MLGPowerInfusion/
+          cp Media/*.tga Media/*.mp3 dist/MLGPowerInfusion/Media/
+          sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" dist/MLGPowerInfusion/MLGPowerInfusion.toc
+          (cd dist && zip -qr "../${ZIP}" MLGPowerInfusion)
           # release.json is what WoWUp reads to pick the right asset for retail
           cat > release.json <<JSON
           {
             "releases": [
               {
-                "name": "PowerInfusionMLG",
+                "name": "MLGPowerInfusion",
                 "version": "${VERSION}",
                 "filename": "${ZIP}",
                 "nolib": false,

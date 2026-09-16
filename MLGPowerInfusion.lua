@@ -2,7 +2,7 @@ local ADDON, ns = ...
 
 local POWER_INFUSION = 10060
 local PI_DURATION = 15
-local MEDIA = "Interface\\AddOns\\PowerInfusionMLG\\Media\\"
+local MEDIA = "Interface\\AddOns\\MLGPowerInfusion\\Media\\"
 local SOUND = MEDIA .. "mlg.mp3"
 local LOGO = MEDIA .. "logo"
 local LOGO_ICON = "|T" .. LOGO .. ":16:16|t"
@@ -21,7 +21,7 @@ local DEFAULTS = { enabled = true, alert = true, channel = "Master" }
 local db, lastMessage, soundID
 
 local function Print(msg)
-    print(LOGO_ICON .. " |cffff66ccPI MLG|r " .. msg)
+    print(LOGO_ICON .. " |cffff66ccMLG Power Infusion|r " .. msg)
 end
 
 local function PickMessage()
@@ -282,8 +282,8 @@ events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if ... ~= ADDON then return end
-        PowerInfusionMLGDB = PowerInfusionMLGDB or {}
-        db = PowerInfusionMLGDB
+        MLGPowerInfusionDB = MLGPowerInfusionDB or {}
+        db = MLGPowerInfusionDB
         for k, v in pairs(DEFAULTS) do
             if db[k] == nil then db[k] = v end
         end
@@ -305,8 +305,8 @@ local function Toggle(key, label)
     RefreshAuraBanner()
 end
 
-SLASH_POWERINFUSIONMLG1 = "/pimlg"
-SlashCmdList.POWERINFUSIONMLG = function(msg)
+SLASH_MLGPOWERINFUSION1 = "/pimlg"
+SlashCmdList.MLGPOWERINFUSION = function(msg)
     msg = strlower(strtrim(msg or ""))
     if msg == "test" then
         PlayMLG()
@@ -328,19 +328,19 @@ SlashCmdList.POWERINFUSIONMLG = function(msg)
     end
 end
 
-function PIMLG_OnCompartmentClick()
+function MLGPowerInfusion_OnCompartmentClick()
     PlayMLG()
 end
 
-function PIMLG_OnCompartmentEnter(_, button)
+function MLGPowerInfusion_OnCompartmentEnter(_, button)
     GameTooltip:SetOwner(button, "ANCHOR_LEFT")
-    GameTooltip:AddLine(LOGO_ICON .. " Power Infusion MLG")
+    GameTooltip:AddLine(LOGO_ICON .. " MLG Power Infusion")
     GameTooltip:AddLine(db.enabled and "|cff00ff00Enabled|r" or "|cffff0000Disabled|r")
     GameTooltip:AddLine("Click to test.", 1, 1, 1)
     GameTooltip:AddLine("/pimlg for commands", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end
 
-function PIMLG_OnCompartmentLeave()
+function MLGPowerInfusion_OnCompartmentLeave()
     GameTooltip:Hide()
 end
