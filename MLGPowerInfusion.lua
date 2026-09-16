@@ -264,15 +264,19 @@ local function RefreshAuraBanner()
 end
 
 -- Sound: Blizzard plays aura sounds itself, so it works in combat.
--- Registering is blocked in combat, so we retry after combat.
+-- Registering can be blocked (combat, instances), so the old sound is only
+-- removed once the new one is in, and we retry after combat.
 local function RegisterSound()
+    local newID
+    if db.enabled then
+        local ok, id = pcall(C_UnitAuras.AddAuraSound, Enum.UnitAuraSoundTrigger.Added, {
+            spellID = POWER_INFUSION, unitToken = "player", soundFileName = SOUND, outputChannel = db.channel,
+        })
+        if not (ok and type(id) == "number") then return end
+        newID = id
+    end
     if soundID then pcall(C_UnitAuras.RemoveAuraSound, soundID) end
-    soundID = nil
-    if not db.enabled then return end
-    local ok, id = pcall(C_UnitAuras.AddAuraSound, Enum.UnitAuraSoundTrigger.Added, {
-        spellID = POWER_INFUSION, unitToken = "player", soundFileName = SOUND, outputChannel = db.channel,
-    })
-    if ok and type(id) == "number" then soundID = id end
+    soundID = newID
 end
 
 local events = CreateFrame("Frame")
@@ -290,7 +294,7 @@ events:SetScript("OnEvent", function(self, event, ...)
         self:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_ENTERING_WORLD" then
         RefreshAuraBanner()
-        RegisterSound()
+        if not soundID then RegisterSound() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if not soundID then RegisterSound() end
         if auraBanner and auraBanner.formatter then BindAuraText(auraBanner) end -- new message for next PI
