@@ -8,10 +8,10 @@ When you gain Power Infusion, a 15 second cut of SICKEST MLG 360 NOSCOPE 2016 pl
 
 | Command | Description |
 |---|---|
-| `/pimlg test` | Play the sound and banner |
-| `/pimlg toggle` | Turn the addon on/off |
-| `/pimlg alert` | Turn the banner on/off (sound still plays) |
-| `/pimlg master` / `sfx` / `music` / `ambience` / `dialog` | Pick which volume slider controls the sound (default: Master) |
+| `/mlgpi test` | Play the sound and banner |
+| `/mlgpi toggle` | Turn the addon on/off |
+| `/mlgpi alert` | Turn the banner on/off (sound still plays) |
+| `/mlgpi master` / `sfx` / `music` / `ambience` / `dialog` | Pick which volume slider controls the sound (default: Master) |
 
 You can also click the addon in the addon compartment (the button by the minimap) to test it.
 

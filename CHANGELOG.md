@@ -5,4 +5,4 @@
 - Initial release
 - Plays a 15 second MLG sound when you gain Power Infusion
 - Top-center banner with random messages, optional animated batchest
-- `/pimlg` commands and addon compartment button
+- `/mlgpi` commands and addon compartment button

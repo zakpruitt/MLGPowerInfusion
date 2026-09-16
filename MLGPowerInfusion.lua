@@ -38,7 +38,7 @@ local function MessageText(msg)
     return (msg.text:gsub("{player}", UnitName("player")))
 end
 
--- Test banner (/pimlg test): a normal frame we fade ourselves
+-- Test banner (/mlgpi test): a normal frame we fade ourselves
 
 local testBanner = CreateFrame("Frame", nil, UIParent)
 testBanner:SetSize(WIDTH, HEIGHT)
@@ -241,7 +241,7 @@ local function CreateAuraContainer()
     container:EnableMouse(false)
     auraContainer = container
 
-    local slotOk, slot = pcall(container.AddAuraSlot, container, "pimlg", "HELPFUL", {
+    local slotOk, slot = pcall(container.AddAuraSlot, container, "mlgpi", "HELPFUL", {
         maxFrameCount = 1,
         initializeFrame = InitAuraButton,
         candidateFilters = { includeSpellIDs = { [POWER_INFUSION] = true } },
@@ -305,7 +305,7 @@ local function Toggle(key, label)
     RefreshAuraBanner()
 end
 
-SLASH_MLGPOWERINFUSION1 = "/pimlg"
+SLASH_MLGPOWERINFUSION1 = "/mlgpi"
 SlashCmdList.MLGPOWERINFUSION = function(msg)
     msg = strlower(strtrim(msg or ""))
     if msg == "test" then
@@ -321,10 +321,10 @@ SlashCmdList.MLGPOWERINFUSION = function(msg)
         RegisterSound()
     else
         Print("commands:")
-        print("  /pimlg test - play the sound and alert")
-        print("  /pimlg toggle - turn the addon on/off")
-        print("  /pimlg alert - turn the on-screen alert on/off")
-        print("  /pimlg master|sfx|music|ambience|dialog - volume channel")
+        print("  /mlgpi test - play the sound and alert")
+        print("  /mlgpi toggle - turn the addon on/off")
+        print("  /mlgpi alert - turn the on-screen alert on/off")
+        print("  /mlgpi master|sfx|music|ambience|dialog - volume channel")
     end
 end
 
@@ -337,7 +337,7 @@ function MLGPowerInfusion_OnCompartmentEnter(_, button)
     GameTooltip:AddLine(LOGO_ICON .. " MLG Power Infusion")
     GameTooltip:AddLine(db.enabled and "|cff00ff00Enabled|r" or "|cffff0000Disabled|r")
     GameTooltip:AddLine("Click to test.", 1, 1, 1)
-    GameTooltip:AddLine("/pimlg for commands", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("/mlgpi for commands", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end
 
