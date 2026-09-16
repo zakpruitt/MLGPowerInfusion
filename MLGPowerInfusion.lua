@@ -10,10 +10,10 @@ local LOGO_ICON = "|T" .. LOGO .. ":16:16|t"
 local WIDTH, HEIGHT = 600, 64
 local BG_PAD_X, BG_PAD_Y = 12, 6
 local ICON_SIZE, ICON_INSET = 56, 4
-local TEXT_INSET = ICON_INSET + ICON_SIZE + 10 -- room for an icon beside the text
+local TEXT_INSET = ICON_INSET + ICON_SIZE + 10
 local TEXT_R, TEXT_G, TEXT_B = 1, 0.85, 0.1
-local FADE_IN, HOLD, FADE_OUT = 0.15, 2.75, 0.6 -- gone 3.5s after PI lands
-local GONE_AT = PI_DURATION - (FADE_IN + HOLD + FADE_OUT) -- PI time remaining when the banner is gone
+local FADE_IN, HOLD, FADE_OUT = 0.15, 2.75, 0.6
+local GONE_AT = PI_DURATION - (FADE_IN + HOLD + FADE_OUT)
 
 local CHANNELS = { master = "Master", sfx = "SFX", music = "Music", ambience = "Ambience", dialog = "Dialog" }
 local DEFAULTS = { enabled = true, alert = true, channel = "Master" }
@@ -37,8 +37,6 @@ end
 local function MessageText(msg)
     return (msg.text:gsub("{player}", UnitName("player")))
 end
-
--- Test banner (/mlgpi test): a normal frame we fade ourselves
 
 local testBanner = CreateFrame("Frame", nil, UIParent)
 testBanner:SetSize(WIDTH, HEIGHT)
@@ -110,21 +108,14 @@ local function PlayMLG()
     fade:Play()
 end
 
--- PI banner: Blizzard's aura button shows while PI is on us, even in combat, but
--- addon scripts can't run on it. Everything is driven by the aura's timer instead:
--- the message is its duration text (blank and faded out after GONE_AT), and the
--- background is a stretched duration bar whose edge sweeps off during the fade.
--- The logo and animated batchest are clipped to that same edge.
-
 local auraContainer, auraBanner
 
--- Inline icons are only a fallback for when the clipped art couldn't be created
 local function BannerString(banner, msg)
     local s = MessageText(msg)
     if not banner.batchest then
         s = "|T" .. LOGO .. ":32:32|t  " .. s
         if msg.batchest then
-            s = s .. "  |T" .. MEDIA .. "batchest:32:32:0:0:512:256:0:64:0:64|t" -- first flipbook frame
+            s = s .. "  |T" .. MEDIA .. "batchest:32:32:0:0:512:256:0:64:0:64|t"
         end
     end
     return s
@@ -169,7 +160,6 @@ local function CreateBackground(banner, button)
     return bar
 end
 
--- Clipped at the background's draining edge, so they wipe away with it
 local function CreateAuraArt(banner, bar)
     local clip = CreateFrame("Frame", nil, banner)
     clip:SetPoint("TOPLEFT")
@@ -214,7 +204,6 @@ local function InitAuraButton(button)
     textHost:SetAllPoints()
     textHost:SetFrameLevel(banner:GetFrameLevel() + 5)
 
-    -- The engine sets the text on registration, so the font must already be set
     banner.text = textHost:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     banner.text:SetPoint("TOPLEFT", banner.batchest and TEXT_INSET or 0, 0)
     banner.text:SetPoint("BOTTOMRIGHT")
@@ -222,7 +211,6 @@ local function InitAuraButton(button)
     banner.text:SetShadowOffset(2, -2)
 
     if not (pcall(CreateTextBinding, banner) and BindAuraText(banner)) then
-        -- No engine text: static message for the whole PI window
         banner.formatter = nil
         local msg = PickMessage()
         banner.text:SetText(BannerString(banner, msg))
@@ -263,9 +251,6 @@ local function RefreshAuraBanner()
     if auraContainer.UpdateAllAuras then pcall(auraContainer.UpdateAllAuras, auraContainer) end
 end
 
--- Sound: Blizzard plays aura sounds itself, so it works in combat.
--- Registering can be blocked (combat, instances), so the old sound is only
--- removed once the new one is in, and we retry after combat.
 local function RegisterSound()
     local newID
     if db.enabled then
@@ -297,11 +282,9 @@ events:SetScript("OnEvent", function(self, event, ...)
         if not soundID then RegisterSound() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if not soundID then RegisterSound() end
-        if auraBanner and auraBanner.formatter then BindAuraText(auraBanner) end -- new message for next PI
+        if auraBanner and auraBanner.formatter then BindAuraText(auraBanner) end
     end
 end)
-
--- Commands
 
 local function Toggle(key, label)
     db[key] = not db[key]
