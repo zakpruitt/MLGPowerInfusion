@@ -58,6 +58,7 @@ local function CreateLogo(parent, anchor)
 end
 
 CreateLogo(testBanner, testBanner)
+
 local function CreateBatchest(parent, anchor)
     local tex = parent:CreateTexture(nil, "ARTWORK")
     tex:SetSize(ICON_SIZE, ICON_SIZE)
