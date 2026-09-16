@@ -9,6 +9,8 @@ local LOGO_ICON = "|T" .. LOGO .. ":16:16|t"
 
 local WIDTH, HEIGHT = 600, 64
 local BG_PAD_X, BG_PAD_Y = 12, 6
+local ICON_SIZE, ICON_INSET = 56, 4
+local TEXT_INSET = ICON_INSET + ICON_SIZE + 10 -- room for an icon beside the text
 local TEXT_R, TEXT_G, TEXT_B = 1, 0.85, 0.1
 local FADE_IN, HOLD, FADE_OUT = 0.15, 2.75, 0.6 -- gone 3.5s after PI lands
 local GONE_AT = PI_DURATION - (FADE_IN + HOLD + FADE_OUT) -- PI time remaining when the banner is gone
@@ -49,29 +51,37 @@ bg:SetPoint("TOPLEFT", -BG_PAD_X, BG_PAD_Y)
 bg:SetPoint("BOTTOMRIGHT", BG_PAD_X, -BG_PAD_Y)
 bg:SetColorTexture(0, 0, 0, 0.55)
 
-local logo = testBanner:CreateTexture(nil, "ARTWORK")
-logo:SetSize(56, 56)
-logo:SetPoint("LEFT", 4, 0)
-logo:SetTexture(LOGO)
+local function CreateLogo(parent, anchor)
+    local tex = parent:CreateTexture(nil, "ARTWORK")
+    tex:SetSize(ICON_SIZE, ICON_SIZE)
+    tex:SetPoint("LEFT", anchor, "LEFT", ICON_INSET, 0)
+    tex:SetTexture(LOGO)
+    return tex
+end
 
-local batchest = testBanner:CreateTexture(nil, "ARTWORK")
-batchest:SetSize(56, 56)
-batchest:SetPoint("RIGHT", -4, 0)
-batchest:SetTexture(MEDIA .. "batchest")
+CreateLogo(testBanner, testBanner)
+local function CreateBatchest(parent, anchor)
+    local tex = parent:CreateTexture(nil, "ARTWORK")
+    tex:SetSize(ICON_SIZE, ICON_SIZE)
+    tex:SetPoint("RIGHT", anchor, "RIGHT", -ICON_INSET, 0)
+    tex:SetTexture(MEDIA .. "batchest")
+    tex.flipbook = tex:CreateAnimationGroup()
+    tex.flipbook:SetLooping("REPEAT")
+    local frames = tex.flipbook:CreateAnimation("FlipBook")
+    frames:SetFlipBookRows(4)
+    frames:SetFlipBookColumns(8)
+    frames:SetFlipBookFrames(21)
+    frames:SetDuration(21 * 0.04)
+    return tex
+end
+
+local batchest = CreateBatchest(testBanner, testBanner)
 
 local testText = testBanner:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-testText:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-testText:SetPoint("RIGHT", -70, 0)
+testText:SetPoint("LEFT", TEXT_INSET, 0)
+testText:SetPoint("RIGHT", -TEXT_INSET, 0)
 testText:SetTextColor(TEXT_R, TEXT_G, TEXT_B)
 testText:SetShadowOffset(2, -2)
-
-local flipbook = batchest:CreateAnimationGroup()
-flipbook:SetLooping("REPEAT")
-local frames = flipbook:CreateAnimation("FlipBook")
-frames:SetFlipBookRows(4)
-frames:SetFlipBookColumns(8)
-frames:SetFlipBookFrames(21)
-frames:SetDuration(21 * 0.04)
 
 local fade = testBanner:CreateAnimationGroup()
 local fadeIn = fade:CreateAnimation("Alpha")
@@ -84,7 +94,7 @@ fadeOut:SetToAlpha(0)
 fadeOut:SetStartDelay(FADE_IN + HOLD)
 fadeOut:SetDuration(FADE_OUT)
 fade:SetScript("OnFinished", function()
-    flipbook:Stop()
+    batchest.flipbook:Stop()
     testBanner:Hide()
 end)
 
@@ -95,7 +105,7 @@ local function PlayMLG()
     testText:SetText(MessageText(msg))
     batchest:SetShown(msg.batchest == true)
     fade:Stop()
-    flipbook:Restart()
+    batchest.flipbook:Restart()
     testBanner:Show()
     fade:Play()
 end
@@ -104,22 +114,34 @@ end
 -- addon scripts can't run on it. Everything is driven by the aura's timer instead:
 -- the message is its duration text (blank and faded out after GONE_AT), and the
 -- background is a stretched duration bar whose edge sweeps off during the fade.
+-- The logo and animated batchest are clipped to that same edge.
 
 local auraContainer, auraBanner
 
-local function BannerString(msg)
-    local s = "|T" .. LOGO .. ":32:32|t  " .. MessageText(msg):gsub("%%", "%%%%")
-    if msg.batchest then
-        s = s .. "  |T" .. MEDIA .. "batchest:32:32:0:0:512:256:0:64:0:64|t" -- first flipbook frame
+-- Inline icons are only a fallback for when the clipped art couldn't be created
+local function BannerString(banner, msg)
+    local s = MessageText(msg)
+    if not banner.batchest then
+        s = "|T" .. LOGO .. ":32:32|t  " .. s
+        if msg.batchest then
+            s = s .. "  |T" .. MEDIA .. "batchest:32:32:0:0:512:256:0:64:0:64|t" -- first flipbook frame
+        end
     end
     return s
 end
 
+local function ShowBatchest(banner, show)
+    banner.batchest:SetShown(show)
+    banner.text:SetPoint("BOTTOMRIGHT", show and -TEXT_INSET or 0, 0)
+end
+
 local function BindAuraText(banner)
+    local msg = PickMessage()
+    if banner.batchest then pcall(ShowBatchest, banner, msg.batchest == true) end
     return pcall(function()
         banner.formatter:SetBreakpoints({
             { threshold = 0, format = "" },
-            { threshold = GONE_AT, format = BannerString(PickMessage()) },
+            { threshold = GONE_AT, format = (BannerString(banner, msg):gsub("%%", "%%%%")) },
         })
         banner.button:SetDurationText(banner.text, { binding = banner.binding })
     end)
@@ -144,6 +166,21 @@ local function CreateBackground(banner, button)
         interpolation = Enum.StatusBarInterpolation.Immediate,
         direction = Enum.StatusBarTimerDirection.RemainingTime,
     })
+    return bar
+end
+
+-- Clipped at the background's draining edge, so they wipe away with it
+local function CreateAuraArt(banner, bar)
+    local clip = CreateFrame("Frame", nil, banner)
+    clip:SetPoint("TOPLEFT")
+    clip:SetPoint("BOTTOM")
+    clip:SetPoint("RIGHT", bar:GetStatusBarTexture(), "RIGHT")
+    clip:SetClipsChildren(true)
+    clip:SetFrameLevel(banner:GetFrameLevel() + 5)
+    CreateLogo(clip, banner)
+    local tex = CreateBatchest(clip, banner)
+    tex.flipbook:Play()
+    return tex
 end
 
 local function CreateTextBinding(banner)
@@ -166,7 +203,12 @@ local function InitAuraButton(button)
     banner:SetSize(WIDTH, HEIGHT)
     banner:SetPoint("CENTER", auraContainer)
     banner.button = button
-    pcall(CreateBackground, banner, button)
+
+    local bgOk, bar = pcall(CreateBackground, banner, button)
+    if bgOk then
+        local ok, tex = pcall(CreateAuraArt, banner, bar)
+        banner.batchest = ok and tex or nil
+    end
 
     local textHost = CreateFrame("Frame", nil, banner)
     textHost:SetAllPoints()
@@ -174,14 +216,17 @@ local function InitAuraButton(button)
 
     -- The engine sets the text on registration, so the font must already be set
     banner.text = textHost:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    banner.text:SetAllPoints()
+    banner.text:SetPoint("TOPLEFT", banner.batchest and TEXT_INSET or 0, 0)
+    banner.text:SetPoint("BOTTOMRIGHT")
     banner.text:SetTextColor(TEXT_R, TEXT_G, TEXT_B)
     banner.text:SetShadowOffset(2, -2)
 
     if not (pcall(CreateTextBinding, banner) and BindAuraText(banner)) then
         -- No engine text: static message for the whole PI window
         banner.formatter = nil
-        banner.text:SetText(MessageText(PickMessage()))
+        local msg = PickMessage()
+        banner.text:SetText(BannerString(banner, msg))
+        if banner.batchest then pcall(ShowBatchest, banner, msg.batchest == true) end
     end
     auraBanner = banner
 end
