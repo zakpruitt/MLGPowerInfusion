@@ -25,3 +25,10 @@ Blizzard hides Power Infusion from addons in combat, so the addon registers the 
 
 - **Sound:** works everywhere. It is registered out of combat (login, `/reload`, or leaving combat) because Blizzard blocks registering in combat.
 - **Banner:** uses Blizzard's aura frame (`AuraContainer`), which the game shows by itself while PI is on you, so it also works in combat. Blizzard blocks addons from reacting when that frame appears, so the banner is drawn from the aura's own timer: the game swaps in the message and fades it out (background, logo and batchest included) 3.5 seconds after PI lands. A new random message is picked each time you leave combat.
+
+<!-- portfolio
+section: more
+name: MLG Power Infusion
+year: 2026
+summary: A World of Warcraft addon that plays an MLG air horn when you get Power Infusion.
+-->
