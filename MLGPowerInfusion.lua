@@ -97,9 +97,11 @@ fade:SetScript("OnFinished", function()
     testBanner:Hide()
 end)
 
-local function PlayMLG()
+local function PlaySound()
     PlaySoundFile(SOUND, db.channel)
-    if not db.alert then return end
+end
+
+local function ShowBanner()
     local msg = PickMessage()
     testText:SetText(MessageText(msg))
     batchest:SetShown(msg.batchest == true)
@@ -107,6 +109,11 @@ local function PlayMLG()
     batchest.flipbook:Restart()
     testBanner:Show()
     fade:Play()
+end
+
+local function PlayMLG()
+    PlaySound()
+    if db.alert then ShowBanner() end
 end
 
 local auraContainer, auraBanner
@@ -252,7 +259,12 @@ local function RefreshAuraBanner()
     if auraContainer.UpdateAllAuras then pcall(auraContainer.UpdateAllAuras, auraContainer) end
 end
 
+local function CanRegisterSound()
+    return C_UnitAuras and C_UnitAuras.AddAuraSound and Enum.UnitAuraSoundTrigger
+end
+
 local function RegisterSound()
+    if not CanRegisterSound() then return end
     local newID
     if db.enabled then
         local ok, id = pcall(C_UnitAuras.AddAuraSound, Enum.UnitAuraSoundTrigger.Added, {
@@ -265,10 +277,30 @@ local function RegisterSound()
     soundID = newID
 end
 
+-- Without a registered aura sound (clients that lack it), watch for PI ourselves. Auras can be hidden from
+-- addons in combat, so this only fires when PI is readable; a hidden read leaves the last state alone.
+local hadPI = false
+
+local function CheckPowerInfusion()
+    if soundID or not db.enabled then return end
+    local ok, has = pcall(function()
+        local aura = C_UnitAuras.GetPlayerAuraBySpellID(POWER_INFUSION)
+        if issecretvalue and issecretvalue(aura) then error("secret") end
+        return aura ~= nil
+    end)
+    if not ok then return end
+    if has and not hadPI then
+        PlaySound()
+        if db.alert and not auraContainer then ShowBanner() end
+    end
+    hadPI = has
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
+events:RegisterUnitEvent("UNIT_AURA", "player")
 events:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if ... ~= ADDON then return end
@@ -284,6 +316,9 @@ events:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         if not soundID then RegisterSound() end
         if auraBanner and auraBanner.formatter then BindAuraText(auraBanner) end
+        CheckPowerInfusion()
+    elseif event == "UNIT_AURA" and db then
+        CheckPowerInfusion()
     end
 end)
 
@@ -307,9 +342,19 @@ SlashCmdList.MLGPOWERINFUSION = function(msg)
         db.channel = CHANNELS[msg]
         Print("sound channel set to " .. db.channel)
         RegisterSound()
+    elseif msg == "status" then
+        if soundID then
+            Print("sound: registered with Blizzard (plays in combat)")
+        elseif CanRegisterSound() then
+            Print("sound: not registered yet (retries out of combat)")
+        else
+            Print("sound: this client can't register aura sounds; plays when PI lands out of combat")
+        end
+        Print("banner: " .. (auraContainer and "Blizzard aura frame (shows in combat)" or "out of combat only"))
     else
         Print("commands:")
         print("  /mlgpi test - play the sound and alert")
+        print("  /mlgpi status - show what this client supports")
         print("  /mlgpi toggle - turn the addon on/off")
         print("  /mlgpi alert - turn the on-screen alert on/off")
         print("  /mlgpi master|sfx|music|ambience|dialog - volume channel")

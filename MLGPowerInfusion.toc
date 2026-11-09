@@ -1,8 +1,8 @@
-## Interface: 120100, 120001
+## Interface: 120100, 120001, 16001
 ## Title: MLG Power Infusion
 ## Notes: Makes your Power Infusion windows dank.
 ## Author: spuggies
-## Version: 1.2.0
+## Version: 1.3.0
 ## Category: Audio & Video
 ## IconTexture: Interface\AddOns\MLGPowerInfusion\Media\logo
 ## AddonCompartmentFunc: MLGPowerInfusion_OnCompartmentClick
