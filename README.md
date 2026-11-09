@@ -4,11 +4,14 @@ Makes your Power Infusion windows dank.
 
 When you gain Power Infusion, a 15 second cut of SICKEST MLG 360 NOSCOPE 2016 plays (timed so the drop hits mid-window) and a banner pops up at the top of your screen with a random message.
 
+Works on retail and WoW: Forever.
+
 ## Commands
 
 | Command | Description |
 |---|---|
 | `/mlgpi test` | Play the sound and banner |
+| `/mlgpi status` | Show whether the sound and banner can fire in combat on your client |
 | `/mlgpi toggle` | Turn the addon on/off |
 | `/mlgpi alert` | Turn the banner on/off (sound still plays) |
 | `/mlgpi master` / `sfx` / `music` / `ambience` / `dialog` | Pick which volume slider controls the sound (default: Master) |
@@ -25,6 +28,7 @@ Blizzard hides Power Infusion from addons in combat, so the addon registers the 
 
 - **Sound:** works everywhere. It is registered out of combat (login, `/reload`, or leaving combat) because Blizzard blocks registering in combat.
 - **Banner:** uses Blizzard's aura frame (`AuraContainer`), which the game shows by itself while PI is on you, so it also works in combat. Blizzard blocks addons from reacting when that frame appears, so the banner is drawn from the aura's own timer: the game swaps in the message and fades it out (background, logo and batchest included) 3.5 seconds after PI lands. A new random message is picked each time you leave combat.
+- **Fallback:** if a client can't register aura sounds, the addon watches for PI itself. That only works while the game lets addons read your buffs, so it may miss PI in combat. `/mlgpi status` shows which path your client uses.
 
 <!-- portfolio
 section: more
