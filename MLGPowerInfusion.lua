@@ -35,7 +35,9 @@ local function PickMessage()
 end
 
 local function MessageText(msg)
-    return (msg.text:gsub("{player}", UnitName("player")))
+    -- Forever's UnitName also returns the surname, which gsub would take as its repeat count.
+    local name = UnitName("player")
+    return (msg.text:gsub("{player}", name))
 end
 
 local testBanner = CreateFrame("Frame", nil, UIParent)
