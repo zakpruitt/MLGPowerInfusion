@@ -5,6 +5,8 @@
 - WoW: Forever support
 - Falls back to watching for Power Infusion on clients without Blizzard's aura sounds
 - `/mlgpi status` shows whether the sound and banner can fire in combat
+- Fixed the banner text erroring on Forever characters with a surname
+- Releases are tagged for Forever as well as retail
 
 ## 1.2.0 (2026-09-16)
 
