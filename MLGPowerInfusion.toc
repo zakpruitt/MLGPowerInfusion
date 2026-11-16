@@ -4,6 +4,7 @@
 ## Author: spuggies
 ## Version: 1.3.0
 ## Category: Audio & Video
+## X-Curse-Project-ID: 1698864
 ## IconTexture: Interface\AddOns\MLGPowerInfusion\Media\logo
 ## AddonCompartmentFunc: MLGPowerInfusion_OnCompartmentClick
 ## AddonCompartmentFuncOnEnter: MLGPowerInfusion_OnCompartmentEnter

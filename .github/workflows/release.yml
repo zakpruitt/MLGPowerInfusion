@@ -25,9 +25,10 @@ jobs:
         run: |
           # Major.minor comes from the .toc; the patch is the run number
           BASE=$(sed -nE 's/^## Version:[[:space:]]*([0-9]+\.[0-9]+).*/\1/p' MLGPowerInfusion.toc)
-          INTERFACE=$(sed -nE 's/^## Interface:[[:space:]]*([0-9]+).*/\1/p' MLGPowerInfusion.toc | head -1)
+          # Every interface on the .toc line, e.g. "120100 120001 16001"
+          INTERFACES=$(sed -nE 's/^## Interface:[[:space:]]*//p' MLGPowerInfusion.toc | head -1 | tr ',' ' ' | xargs)
           echo "version=${BASE}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          echo "interface=${INTERFACE}" >> "$GITHUB_OUTPUT"
+          echo "interfaces=${INTERFACES}" >> "$GITHUB_OUTPUT"
 
       - name: Package
         id: pkg
@@ -40,22 +41,15 @@ jobs:
           cp Media/*.tga Media/*.mp3 dist/MLGPowerInfusion/Media/
           sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" dist/MLGPowerInfusion/MLGPowerInfusion.toc
           (cd dist && zip -qr "../${ZIP}" MLGPowerInfusion)
-          # release.json is what WoWUp reads to pick the right asset for retail
-          cat > release.json <<JSON
-          {
-            "releases": [
-              {
-                "name": "MLGPowerInfusion",
-                "version": "${VERSION}",
-                "filename": "${ZIP}",
-                "nolib": false,
-                "metadata": [
-                  { "flavor": "mainline", "interface": ${{ steps.ver.outputs.interface }} }
-                ]
-              }
-            ]
-          }
-          JSON
+          # release.json is what WoWUp reads to match the asset to a game.
+          # Forever interfaces are 16xxx; everything else on the line is retail.
+          for i in ${{ steps.ver.outputs.interfaces }}; do
+            if [ "$i" -ge 16000 ] && [ "$i" -lt 20000 ]; then FLAVOR=forever; else FLAVOR=mainline; fi
+            jq -n --arg flavor "$FLAVOR" --argjson interface "$i" '{flavor: $flavor, interface: $interface}'
+          done | jq -s --arg version "$VERSION" --arg zip "$ZIP" \
+            '{releases: [{name: "MLGPowerInfusion", version: $version, filename: $zip, nolib: false, metadata: .}]}' \
+            > release.json
+          cat release.json
           echo "zip=${ZIP}" >> "$GITHUB_OUTPUT"
 
       - name: Release notes
@@ -78,3 +72,36 @@ jobs:
             --title "v${{ steps.ver.outputs.version }}" \
             --notes-file notes.md \
             --target "$(git rev-parse HEAD)"
+
+      - name: Upload to CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: |
+          PROJECT=$(sed -nE 's/^## X-Curse-Project-ID:[[:space:]]*([0-9]+).*/\1/p' MLGPowerInfusion.toc)
+          if [ -z "$CF_API_KEY" ] || [ -z "$PROJECT" ]; then
+            echo "::notice::Skipped the CurseForge upload: it needs the CF_API_KEY secret and '## X-Curse-Project-ID' in the .toc"
+            exit 0
+          fi
+          # CurseForge tags files by game version ID, so each interface is looked up by name:
+          # 120100 -> 12.1.0 under retail, 16001 -> 1.60.1 under Forever.
+          VERSIONS=$(curl -fsS -H "x-api-token: $CF_API_KEY" https://wow.curseforge.com/api/game/wow/versions)
+          IDS=()
+          for i in ${{ steps.ver.outputs.interfaces }}; do
+            NAME="$((i / 10000)).$((i / 100 % 100)).$((i % 100))"
+            if [ "$i" -ge 16000 ] && [ "$i" -lt 20000 ]; then TYPE=88568; else TYPE=517; fi
+            ID=$(jq -r --arg v "$NAME" --argjson t "$TYPE" \
+              '[.[] | select(.gameVersionTypeID == $t and .name == $v)][0].id // empty' <<< "$VERSIONS")
+            if [ -z "$ID" ]; then
+              echo "::error::CurseForge has no game version ${NAME} for interface ${i}"
+              exit 1
+            fi
+            echo "interface ${i} -> ${NAME} (id ${ID})"
+            IDS+=("$ID")
+          done
+          jq -n --arg name "${{ steps.ver.outputs.version }}" --rawfile changelog notes.md \
+            --argjson ids "$(printf '%s\n' "${IDS[@]}" | jq -s .)" \
+            '{displayName: $name, gameVersions: $ids, releaseType: "release", changelog: $changelog, changelogType: "markdown"}' \
+            > cf.json
+          curl -fsS --retry 3 --retry-delay 10 -H "x-api-token: $CF_API_KEY" \
+            -F "metadata=<cf.json" -F "file=@${{ steps.pkg.outputs.zip }}" \
+            "https://wow.curseforge.com/api/projects/${PROJECT}/upload-file"
