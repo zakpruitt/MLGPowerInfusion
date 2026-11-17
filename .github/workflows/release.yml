@@ -38,7 +38,7 @@ jobs:
           # Only what WoW loads; source art stays out of the zip
           rm -rf dist && mkdir -p dist/MLGPowerInfusion/Media
           cp MLGPowerInfusion.toc *.lua dist/MLGPowerInfusion/
-          cp Media/*.tga Media/*.mp3 dist/MLGPowerInfusion/Media/
+          cp Media/*.tga Media/*.mp3 Media/*.ogg dist/MLGPowerInfusion/Media/
           sed -i -E "s/^## Version:.*/## Version: ${VERSION}/" dist/MLGPowerInfusion/MLGPowerInfusion.toc
           (cd dist && zip -qr "../${ZIP}" MLGPowerInfusion)
           # release.json is what WoWUp reads to match the asset to a game.

@@ -7,6 +7,8 @@
 - `/mlgpi status` shows whether the sound and banner can fire in combat
 - Fixed the banner text erroring on Forever characters with a surname
 - Releases are tagged for Forever as well as retail
+- The full track plays again: Blizzard now stops aura sounds after 5 seconds, so the addon plays the rest itself
+- `/mlgpi debug` prints how Power Infusion is being detected
 
 ## 1.2.0 (2026-09-16)
 

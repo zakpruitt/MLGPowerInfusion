@@ -4,6 +4,12 @@ local POWER_INFUSION = 10060
 local PI_DURATION = 15
 local MEDIA = "Interface\\AddOns\\MLGPowerInfusion\\Media\\"
 local SOUND = MEDIA .. "mlg.mp3"
+-- Blizzard stops aura sounds after 5 seconds, so only the intro is registered and the addon plays the rest.
+local SOUND_INTRO = MEDIA .. "mlg_intro.ogg"
+local SOUND_REST = MEDIA .. "mlg_rest.ogg"
+local REST_AT = 4.85
+local GAIN_GUARD = 10
+local CAST_SETTLE = 0.3
 local LOGO = MEDIA .. "logo"
 local LOGO_ICON = "|T" .. LOGO .. ":16:16|t"
 
@@ -22,6 +28,12 @@ local db, lastMessage, soundID
 
 local function Print(msg)
     print(LOGO_ICON .. " |cffff66ccMLG Power Infusion|r " .. msg)
+end
+
+local function Debug(msg)
+    if db and db.debug then
+        Print("|cff888888[" .. (InCombatLockdown() and "combat" or "no combat") .. "]|r " .. msg)
+    end
 end
 
 local function PickMessage()
@@ -99,8 +111,24 @@ fade:SetScript("OnFinished", function()
     testBanner:Hide()
 end)
 
+local restTimer
+
+local function PlayRest(delay)
+    if restTimer then restTimer:Cancel() end
+    restTimer = C_Timer.NewTimer(math.max(delay, 0), function()
+        restTimer = nil
+        PlaySoundFile(SOUND_REST, db.channel)
+    end)
+end
+
+-- Mirrors what a real PI plays on this client.
 local function PlaySound()
-    PlaySoundFile(SOUND, db.channel)
+    if soundID then
+        PlaySoundFile(SOUND_INTRO, db.channel)
+        PlayRest(REST_AT)
+    else
+        PlaySoundFile(SOUND, db.channel)
+    end
 end
 
 local function ShowBanner()
@@ -270,7 +298,7 @@ local function RegisterSound()
     local newID
     if db.enabled then
         local ok, id = pcall(C_UnitAuras.AddAuraSound, Enum.UnitAuraSoundTrigger.Added, {
-            spellID = POWER_INFUSION, unitToken = "player", soundFileName = SOUND, outputChannel = db.channel,
+            spellID = POWER_INFUSION, unitToken = "player", soundFileName = SOUND_INTRO, outputChannel = db.channel,
         })
         if not (ok and type(id) == "number") then return end
         newID = id
@@ -279,23 +307,94 @@ local function RegisterSound()
     soundID = newID
 end
 
--- Without a registered aura sound (clients that lack it), watch for PI ourselves. Auras can be hidden from
--- addons in combat, so this only fires when PI is readable; a hidden read leaves the last state alone.
-local hadPI = false
+-- In combat the game hides PI from addons (the read fails or says it is off), so the player's own PI cast
+-- is the signal there. Clients without aura sounds get the whole track from here.
+local hadPI, lastGain, lastRead, castsHidden, castOnOther = false, 0, nil, false, false
 
-local function CheckPowerInfusion()
-    if soundID or not db.enabled then return end
-    local ok, has = pcall(function()
+local function ReadPowerInfusion()
+    local ok, has, age = pcall(function()
         local aura = C_UnitAuras.GetPlayerAuraBySpellID(POWER_INFUSION)
         if issecretvalue and issecretvalue(aura) then error("secret") end
-        return aura ~= nil
+        if not aura then return false end
+        return true, GetTime() - (aura.expirationTime - aura.duration)
     end)
-    if not ok then return end
-    if has and not hadPI then
-        PlaySound()
+    local read = not ok and "hidden" or has and "on" or "off"
+    if read ~= lastRead then
+        lastRead = read
+        Debug("PI aura read: " .. read)
+    end
+    return ok, has, age
+end
+
+local function OnPowerInfusion(source, age)
+    local now = GetTime()
+    if now - lastGain < GAIN_GUARD then return end
+    if soundID then
+        if age >= REST_AT then return end
+        PlayRest(REST_AT - age)
+    else
+        PlaySoundFile(SOUND, db.channel)
         if db.alert and not auraContainer then ShowBanner() end
     end
+    lastGain = now
+    Debug(("PI detected by %s, %.2fs after it landed"):format(source, age))
+end
+
+local function CheckPowerInfusion()
+    if not db.enabled then return end
+    local ok, has, age = ReadPowerInfusion()
+    if not ok then return end
+    if has and not hadPI then OnPowerInfusion("aura", age) end
     hadPI = has
+end
+
+local function IsPowerInfusion(spellID)
+    return pcall(function()
+        if issecretvalue and issecretvalue(spellID) then error("secret") end
+        return spellID == POWER_INFUSION
+    end)
+end
+
+-- The sent target is only a name, and with an enemy targeted it names the enemy while PI lands on the
+-- player, so the cast only counts as aimed at an ally when the name matches a unit the player can buff.
+local CAST_UNITS = { "target", "focus", "mouseover" }
+
+local function OnSpellcastSent(target, spellID)
+    local ok, isPI = IsPowerInfusion(spellID)
+    if not (ok and isPI) then return end
+    local nameOk, other = pcall(function()
+        if issecretvalue and issecretvalue(target) then error("secret") end
+        if not target or target == "" then return false end
+        for _, unit in ipairs(CAST_UNITS) do
+            if UnitExists(unit) and (target == (UnitName(unit)) or target == GetUnitName(unit, true)) then
+                return UnitCanAssist("player", unit) and not UnitIsUnit(unit, "player")
+            end
+        end
+        return false
+    end)
+    castOnOther = nameOk and other == true
+end
+
+local function OnSpellcast(spellID)
+    local ok, isPI = IsPowerInfusion(spellID)
+    if not ok then
+        if not castsHidden then Debug("your spell casts are hidden") end
+        castsHidden = true
+        return
+    end
+    castsHidden = false
+    if not isPI or not db.enabled then return end
+    Debug("saw your PI cast" .. (castOnOther and " (on an ally)" or ""))
+    local onOther = castOnOther
+    castOnOther = false
+    C_Timer.After(CAST_SETTLE, function()
+        local readable, has = ReadPowerInfusion()
+        if readable and has then
+            CheckPowerInfusion()
+        elseif InCombatLockdown() and not onOther then
+            OnPowerInfusion("cast", CAST_SETTLE)
+        end
+    end)
 end
 
 local events = CreateFrame("Frame")
@@ -303,6 +402,8 @@ events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:RegisterUnitEvent("UNIT_AURA", "player")
+events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+events:RegisterUnitEvent("UNIT_SPELLCAST_SENT", "player")
 events:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if ... ~= ADDON then return end
@@ -321,6 +422,12 @@ events:SetScript("OnEvent", function(self, event, ...)
         CheckPowerInfusion()
     elseif event == "UNIT_AURA" and db then
         CheckPowerInfusion()
+    elseif event == "UNIT_SPELLCAST_SENT" and db then
+        local _, target, _, spellID = ...
+        OnSpellcastSent(target, spellID)
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" and db then
+        local _, _, spellID = ...
+        OnSpellcast(spellID)
     end
 end)
 
@@ -344,9 +451,12 @@ SlashCmdList.MLGPOWERINFUSION = function(msg)
         db.channel = CHANNELS[msg]
         Print("sound channel set to " .. db.channel)
         RegisterSound()
+    elseif msg == "debug" then
+        db.debug = not db.debug
+        Print("debug " .. (db.debug and "on" or "off"))
     elseif msg == "status" then
         if soundID then
-            Print("sound: registered with Blizzard (plays in combat)")
+            Print("sound: registered with Blizzard (plays in combat; the rest of the track follows when PI is detected)")
         elseif CanRegisterSound() then
             Print("sound: not registered yet (retries out of combat)")
         else
@@ -357,6 +467,7 @@ SlashCmdList.MLGPOWERINFUSION = function(msg)
         Print("commands:")
         print("  /mlgpi test - play the sound and alert")
         print("  /mlgpi status - show what this client supports")
+        print("  /mlgpi debug - print how PI is being detected")
         print("  /mlgpi toggle - turn the addon on/off")
         print("  /mlgpi alert - turn the on-screen alert on/off")
         print("  /mlgpi master|sfx|music|ambience|dialog - volume channel")
