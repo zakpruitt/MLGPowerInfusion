@@ -356,8 +356,18 @@ local function IsPowerInfusion(spellID)
 end
 
 -- The sent target is only a name, and with an enemy targeted it names the enemy while PI lands on the
--- player, so the cast only counts as aimed at an ally when the name matches a unit the player can buff.
+-- player. A name matching one of these units is judged by whether the player can buff it; any other
+-- name that is not the player's own came from a unit that is not checked here (a party or raid token,
+-- say), which can only be an ally.
 local CAST_UNITS = { "target", "focus", "mouseover" }
+
+local function UnitHasName(unit, name)
+    if not UnitExists(unit) then return false end
+    -- The second return is the surname on Forever and the realm on retail.
+    local first, second = UnitName(unit)
+    if name == first or name == GetUnitName(unit, true) then return true end
+    return second ~= nil and second ~= "" and name == first .. " " .. second
+end
 
 local function OnSpellcastSent(target, spellID)
     local ok, isPI = IsPowerInfusion(spellID)
@@ -366,13 +376,14 @@ local function OnSpellcastSent(target, spellID)
         if issecretvalue and issecretvalue(target) then error("secret") end
         if not target or target == "" then return false end
         for _, unit in ipairs(CAST_UNITS) do
-            if UnitExists(unit) and (target == (UnitName(unit)) or target == GetUnitName(unit, true)) then
+            if UnitHasName(unit, target) then
                 return UnitCanAssist("player", unit) and not UnitIsUnit(unit, "player")
             end
         end
-        return false
+        return not UnitHasName("player", target)
     end)
     castOnOther = nameOk and other == true
+    Debug("PI cast sent at " .. (nameOk and (castOnOther and "an ally" or "you") or "a hidden target"))
 end
 
 local function OnSpellcast(spellID)

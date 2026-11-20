@@ -9,6 +9,7 @@
 - Releases are tagged for Forever as well as retail
 - The full track plays again: Blizzard now stops aura sounds after 5 seconds, so the addon plays the rest itself
 - `/mlgpi debug` prints how Power Infusion is being detected
+- Fixed the end of the track playing when you cast Power Infusion on someone else in combat
 
 ## 1.2.0 (2026-09-16)
 
